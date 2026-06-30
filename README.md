@@ -5,7 +5,10 @@ Community Hero is a hyperlocal problem solver and civic issue reporting platform
 **Note:** This project is designed as a mobile-first web application, with future plans to be ported into a native Android app.
 
 ## Citizen Dashboard
-<video controls src="screen-recordings/20260630-1707-38.1538841.mp4" title="Title"></video>
+
+
+https://github.com/user-attachments/assets/4cbc76bf-c8f0-4cb8-9aa5-a5545962d9b5
+
 ## Features
 
 ### 📸 Civic Issue Reporting
@@ -25,10 +28,16 @@ Community Hero is a hyperlocal problem solver and civic issue reporting platform
 
 ## Verifier Dashboard
 
-<video controls src="screen-recordings/20260630-1714-35.1314983.mp4" title="Title"></video>
+
+
+https://github.com/user-attachments/assets/e4bf77de-cc26-4519-bcd9-1aa22f4f42c8
+
+
 
 ## Admin Dashboard
-<video controls src="screen-recordings/20260630-1717-16.6598974.mp4" title="Title"></video>
+
+
+https://github.com/user-attachments/assets/2939b83e-8e02-4a92-bdd8-cec64de7c0b0
 
 
 ### 🗺️ Interactive Maps
@@ -41,7 +50,8 @@ Community Hero is a hyperlocal problem solver and civic issue reporting platform
 - **Points History**: Users can view a detailed log of their contributions and impact over time.
 
 ## Leaderboard
-![alt text](screen-recordings/image.png)
+<img width="472" height="689" alt="Screenshot 2026-06-30 224904" src="https://github.com/user-attachments/assets/f5e53f43-ef6e-49b3-8523-b8b1dd13c631" />
+
 
 ### 📈 Predictive Analysis & Regional Trends
 - **Trend Spotting**: Highlights areas (zones) with a high frequency of specific issues (e.g., Water Supply, Infrastructure).
