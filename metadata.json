@@ -1,0 +1,12 @@
+{
+  "name": "Community Hero",
+  "description": "Hyperlocal problem solver for community issues.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
