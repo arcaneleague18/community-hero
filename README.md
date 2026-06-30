@@ -16,10 +16,13 @@ https://github.com/user-attachments/assets/4cbc76bf-c8f0-4cb8-9aa5-a5545962d9b5
 - **Geolocation**: Automatically captures or allows manual input of coordinates to accurately pinpoint the issue location.
 
 ## Reporting
+- **Failed Report** : Due to invalid image
 
 https://github.com/user-attachments/assets/e5877dfb-ab9f-4b61-bc7e-7c5f5bc23814
 
+- **Successful report**
 
+https://github.com/user-attachments/assets/ba3fe446-46e1-4257-b1ea-41b92d4bdd2a
 
 ### 🤖 AI-Powered Verification
 - **Spam Prevention**: Uses the Gemini 2.5 Flash API to automatically verify if the provided description matches the uploaded image before submission.
