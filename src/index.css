@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@layer components {
+  .markdown-body {
+    @apply text-sm leading-relaxed;
+  }
+  .markdown-body p {
+    @apply mb-2 last:mb-0;
+  }
+  .markdown-body strong {
+    @apply font-bold;
+  }
+  .markdown-body em {
+    @apply italic;
+  }
+  .markdown-body ul {
+    @apply list-disc list-inside mb-2;
+  }
+  .markdown-body ol {
+    @apply list-decimal list-inside mb-2;
+  }
+  .markdown-body li {
+    @apply mb-1;
+  }
+  .markdown-body a {
+    @apply underline hover:text-gray-600;
+  }
+  .markdown-body code {
+    @apply bg-gray-100 px-1 py-0.5 rounded font-mono text-xs;
+  }
+  .markdown-body pre {
+    @apply bg-gray-100 p-2 rounded mb-2 overflow-x-auto;
+  }
+  .markdown-body pre code {
+    @apply bg-transparent p-0;
+  }
+}
