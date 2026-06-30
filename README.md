@@ -47,6 +47,7 @@ https://github.com/user-attachments/assets/2939b83e-8e02-4a92-bdd8-cec64de7c0b0
 ### 🗺️ Interactive Maps
 - **Geospatial Visualization**: Integrates Google Maps Platform to visualize reported issues across different regions.
 - **Location Focus**: Users and admins can explore issues on an interactive map, seeing clusters of problems geographically.
+<img width="425" height="623" alt="image" src="https://github.com/user-attachments/assets/6f739707-98b2-402b-9b86-0dc17887d58e" />
 
 ### 🏆 Gamification & Leaderboard
 - **Points System (PTS)**: Users earn points for reporting valid civic issues, promoting active participation in community upkeep.
