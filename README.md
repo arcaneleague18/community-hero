@@ -67,6 +67,7 @@ https://github.com/user-attachments/assets/2939b83e-8e02-4a92-bdd8-cec64de7c0b0
 
 ### 💬 AI Assistant Chatbot
 - **Interactive Helper**: An integrated chatbot that assists users with app navigation, reporting guidelines, and general community queries. Integrated agentic system that can access user's screen whenever it needs to.
+<img width="460" height="798" alt="image" src="https://github.com/user-attachments/assets/af0775e2-0ba8-4932-853a-a263c050f3ea" />
 
 ## Tech Stack
 
