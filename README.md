@@ -15,7 +15,11 @@ https://github.com/user-attachments/assets/4cbc76bf-c8f0-4cb8-9aa5-a5545962d9b5
 - **Capture & Upload**: Users can capture photos of issues (potholes, garbage, broken infrastructure) directly through the app's camera interface or upload them.
 - **Geolocation**: Automatically captures or allows manual input of coordinates to accurately pinpoint the issue location.
 
-![Issue Reporting](https://placehold.co/800x400?text=Civic+Issue+Reporting)
+## Reporting
+
+https://github.com/user-attachments/assets/e5877dfb-ab9f-4b61-bc7e-7c5f5bc23814
+
+
 
 ### 🤖 AI-Powered Verification
 - **Spam Prevention**: Uses the Gemini 2.5 Flash API to automatically verify if the provided description matches the uploaded image before submission.
