@@ -3,16 +3,16 @@ import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimest
 import { Complaint, User } from '../types';
 
 const firebaseConfig = {
-  projectId: "coherent-starlight-c46tg",
-  appId: "1:636434036514:web:b5bf7cbdab9d2254c9d77b",
-  apiKey: "AIzaSyBG7z3CVeHecnqyZ6dCQWhH5OJyMHwPwQ4",
-  authDomain: "coherent-starlight-c46tg.firebaseapp.com",
-  storageBucket: "coherent-starlight-c46tg.firebasestorage.app",
-  messagingSenderId: "636434036514"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, "ai-studio-8d1644d9-e8da-4ad6-8234-60b691f38e8d");
+export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)");
 
 export const addComplaint = async (data: any) => {
   const complaintsRef = collection(db, "complaints");

@@ -81,15 +81,49 @@ https://github.com/user-attachments/assets/2939b83e-8e02-4a92-bdd8-cec64de7c0b0
 
 ## Prerequisites
 
-To run this project locally, you need the following environment variables defined in a `.env` file:
+To run this project locally, you need the following environment variables defined in a `.env` file (see `.env.example` as a template):
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key
 GOOGLE_MAPS_PLATFORM_KEY=your_google_maps_platform_key
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Firebase Configuration
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_DATABASE_ID=(default)
 ```
 
-You also need to have Firebase configured properly for database interactions.
+### 🔥 Firebase Setup
+
+To set up Firebase for this application, follow these steps:
+
+1. **Create a Firebase Project:**
+   - Go to the [Firebase Console](https://console.firebase.google.com/).
+   - Click **Add Project** and follow the prompts to create a new project.
+
+2. **Enable Firestore Database:**
+   - In the Firebase Console left-sidebar, navigate to **Build** > **Firestore Database**.
+   - Click **Create database**.
+   - Choose your database location and start in **Test mode** (or configure custom security rules).
+   - If you are using the default database, your `VITE_FIREBASE_DATABASE_ID` should be set to `(default)`.
+
+3. **Register a Web App:**
+   - In the Firebase Project Overview page, click the **Web** icon (`</>`) to add an app.
+   - Enter an app nickname and click **Register app**.
+
+4. **Get Configuration Keys:**
+   - You will be shown a `firebaseConfig` initialization snippet. Copy the corresponding config values into your local `.env` file for the `VITE_FIREBASE_*` variables.
+
+5. **Initialize Firestore Collections:**
+   - The application automatically interfaces with two Firestore collections:
+     - `users` (handles user profiles, roles, and points)
+     - `complaints` (handles civic issue reports, verification status, and upvotes)
+   - These collections will be created automatically on the first write/submission from the application.
 
 ## Setup Instructions
 
