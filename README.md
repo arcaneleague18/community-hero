@@ -1,10 +1,20 @@
 # Community Hero
 
+<div align="center">
+
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+  <h1>Built with AI Studio</h2>
+
+  <p>The fastest path from prompt to production with Gemini.</p>
+
+</div>
+
 Community Hero is a hyperlocal problem solver and civic issue reporting platform. It empowers citizens to report community issues, verifies their legitimacy with AI, and rewards community engagement.
 
 **Live at**: https://community-hero-636434036514.us-west1.run.app
 
-**Note:** This project is designed as a mobile-first web application, with future plans to be ported into a native Android app.
+**Note:** This project is designed as a mobile-first web application, with future plans to be ported into a native Android app. Did not put any authentication for the ease of testing.
 
 ## Citizen Dashboard
 
