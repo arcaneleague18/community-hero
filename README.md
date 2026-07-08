@@ -12,8 +12,6 @@
 
 Community Hero is a hyperlocal problem solver and civic issue reporting platform. It empowers citizens to report community issues, verifies their legitimacy with AI, and rewards community engagement.
 
-**Live at**: https://community-hero-636434036514.us-west1.run.app
-
 **Note:** This project is designed as a mobile-first web application, with future plans to be ported into a native Android app. Did not put any authentication for the ease of testing.
 
 ## Citizen Dashboard
