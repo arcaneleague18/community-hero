@@ -1,8 +1,78 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // --- Helper functions ---
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'Admin';
+    }
+
+    function isVerifierOrAdmin() {
+      return isSignedIn() && getUserRole() in ['Verifier', 'Admin'];
+    }
+
+    // --- Users collection ---
+    match /users/{userId} {
+      // Anyone signed in can read user profiles (needed for leaderboard, names)
+      allow read: if isSignedIn();
+
+      // A user can only create their own profile, forced to Citizen with 0 points
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'Citizen'
+        && request.resource.data.points == 0;
+
+      // Update rules (evaluated top-to-bottom, first match wins):
+      // 1. Admins can update anything on any user doc (role changes, bans, etc.)
+      // 2. Any signed-in user can update ONLY gamification fields on any user doc
+      //    (needed for cross-user point awards on upvotes, rejections, etc.)
+      // 3. Owner can update their own non-sensitive fields (name, etc.) but NOT role
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['points', 'badges', 'pointsHistory'])
+           )
+        || (isOwner(userId)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['role', 'points', 'badges', 'pointsHistory'])
+           );
+
+      allow delete: if isAdmin();
+    }
+
+    // --- Complaints collection ---
+    match /complaints/{complaintId} {
+      // All signed-in users can read complaints
+      allow read: if isSignedIn();
+
+      // Any signed-in user can create a complaint tied to their own auth UID
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'Pending';
+
+      // Update rules:
+      // 1. Any signed-in user can toggle upvotes (upvotedBy field only)
+      // 2. Verifiers/Admins can update status, assignment, and related fields
+      allow update: if isSignedIn() && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotedBy'])
+        || isVerifierOrAdmin()
+      );
+
+      // Only admins can delete complaints
+      allow delete: if isAdmin();
+    }
+
+    // Deny everything else by default (no wildcard fallthrough)
   }
 }

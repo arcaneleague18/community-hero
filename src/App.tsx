@@ -94,7 +94,10 @@ export default function App() {
     setCurrentView('form');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const { auth } = await import('./lib/firebase');
+    const { signOut } = await import('firebase/auth');
+    try { await signOut(auth); } catch (_) { /* ignore */ }
     setCurrentUser(null);
     setShowRoleSelector(true);
     setCurrentView('landing');

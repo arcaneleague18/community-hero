@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, where, doc, updateDoc, increment, arrayUnion, arrayRemove } from "firebase/firestore";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { Complaint, User } from '../types';
 
 const firebaseConfig = {
@@ -13,11 +14,31 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)");
+export const auth = getAuth(app);
+
+/** Sign in anonymously. Returns the Firebase Auth UID. */
+export const signInAnon = async (): Promise<string> => {
+  const credential = await signInAnonymously(auth);
+  return credential.user.uid;
+};
+
+/** Returns a promise that resolves with the current auth UID once auth state is ready. */
+export const waitForAuth = (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user ? user.uid : null);
+    });
+  });
+};
 
 export const addComplaint = async (data: any) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
   const complaintsRef = collection(db, "complaints");
   return addDoc(complaintsRef, {
     ...data,
+    userId: currentUser.uid, // Force to auth UID, ignore client-supplied value
     createdAt: serverTimestamp(),
     status: 'Pending'
   });
@@ -31,6 +52,7 @@ export const getComplaints = async (): Promise<Complaint[]> => {
 };
 
 export const updateComplaintStatus = async (id: string, status: string, assignedTo?: string, userId?: string, rejectionReason?: string) => {
+  if (!auth.currentUser) throw new Error("Not authenticated");
   const { getDoc } = await import("firebase/firestore");
   const complaintRef = doc(db, "complaints", id);
   const data: any = { status };
@@ -58,7 +80,9 @@ export const updateComplaintStatus = async (id: string, status: string, assigned
   return updateDoc(complaintRef, data);
 };
 
-export const toggleUpvoteComplaint = async (id: string, userId: string, hasUpvoted: boolean) => {
+export const toggleUpvoteComplaint = async (id: string, _userId: string, hasUpvoted: boolean) => {
+  if (!auth.currentUser) throw new Error("Not authenticated");
+  const userId = auth.currentUser.uid; // Use auth UID, ignore caller-supplied value
   const { getDoc } = await import("firebase/firestore");
   const complaintRef = doc(db, "complaints", id);
   
@@ -87,12 +111,9 @@ export const toggleUpvoteComplaint = async (id: string, userId: string, hasUpvot
 
 // Gamification & Users
 export const createUser = async (user: any) => {
+  const { setDoc } = await import("firebase/firestore");
   const userRef = doc(db, "users", user.id);
-  await updateDoc(userRef, user).catch(async () => {
-    // Fallback to create if doesn't exist
-    const { setDoc } = await import("firebase/firestore");
-    await setDoc(userRef, user);
-  });
+  await setDoc(userRef, user, { merge: true });
 };
 
 export const getUser = async (id: string): Promise<User | null> => {
@@ -120,17 +141,20 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const updateUserRole = async (userId: string, role: string) => {
+  if (!auth.currentUser) throw new Error("Not authenticated");
   const userRef = doc(db, "users", userId);
   await updateDoc(userRef, { role });
 };
 
 export const deleteUser = async (userId: string) => {
+  if (!auth.currentUser) throw new Error("Not authenticated");
   const { deleteDoc } = await import("firebase/firestore");
   const userRef = doc(db, "users", userId);
   await deleteDoc(userRef);
 };
 
 export const awardPoints = async (userId: string, points: number, reason: string = "Awarded points") => {
+  if (!auth.currentUser) throw new Error("Not authenticated");
   const userRef = doc(db, "users", userId);
   
   const { getDoc } = await import("firebase/firestore");
