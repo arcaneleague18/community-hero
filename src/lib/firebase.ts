@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, where, doc, updateDoc, increment, arrayUnion, arrayRemove } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Complaint, User } from '../types';
 
 const firebaseConfig = {
@@ -15,6 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)");
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 /** Sign in anonymously. Returns the Firebase Auth UID. */
 export const signInAnon = async (): Promise<string> => {
@@ -62,16 +64,58 @@ export const authFetch = async (input: RequestInfo | URL, init?: RequestInit): P
   });
 };
 
+/**
+ * Uploads a base64 / data-URL media string to Firebase Storage under complaints/{userId}/.
+ * Returns the public download URL.
+ */
+export const uploadComplaintMedia = async (dataUrl: string, userId: string): Promise<string> => {
+  const match = dataUrl.match(/^data:([^;]+);base64,/);
+  const contentType = match ? match[1] : (dataUrl.startsWith('data:video') ? 'video/mp4' : 'image/jpeg');
+  const ext = contentType.split('/')[1] || 'jpg';
+  const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const storagePath = `complaints/${userId}/${filename}`;
+  
+  const storageRef = ref(storage, storagePath);
+  await uploadString(storageRef, dataUrl, 'data_url', {
+    contentType
+  });
+
+  return getDownloadURL(storageRef);
+};
+
 export const addComplaint = async (data: any) => {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
+
+  let imageUrl: string | undefined = data.imageUrl;
+  let imageBase64: string | undefined = data.imageBase64;
+
+  // Offload raw base64 to Firebase Storage to stay well below 1 MiB Firestore document limit
+  if (imageBase64 && !imageUrl) {
+    try {
+      imageUrl = await uploadComplaintMedia(imageBase64, currentUser.uid);
+      imageBase64 = undefined; // Omit heavy base64 from Firestore
+    } catch (storageErr) {
+      console.warn("Firebase Storage upload failed, falling back to base64:", storageErr);
+    }
+  }
+
   const complaintsRef = collection(db, "complaints");
-  return addDoc(complaintsRef, {
+  const docData: any = {
     ...data,
-    userId: currentUser.uid, // Force to auth UID, ignore client-supplied value
+    userId: currentUser.uid,
     createdAt: serverTimestamp(),
     status: 'Pending'
-  });
+  };
+
+  if (imageUrl) {
+    docData.imageUrl = imageUrl;
+    delete docData.imageBase64;
+  } else if (imageBase64) {
+    docData.imageBase64 = imageBase64;
+  }
+
+  return addDoc(complaintsRef, docData);
 };
 
 export const getComplaints = async (): Promise<Complaint[]> => {

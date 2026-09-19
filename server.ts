@@ -137,6 +137,22 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Security Hardening: Disable Express signature header
+  app.disable('x-powered-by');
+
+  // Security Headers Middleware (SEC-07: Clickjacking Defense & Transport Security)
+  app.use((_req, res, next) => {
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'none';");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(self), geolocation=(self)");
+    res.setHeader("X-XSS-Protection", "0");
+    res.setHeader("X-Download-Options", "noopen");
+    next();
+  });
+
   // Rate Limiters
   const geocodeLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

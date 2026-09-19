@@ -394,13 +394,16 @@ export function AdminDashboard({ onBack, currentUser }: { onBack: () => void, cu
                       Assigned To: {complaint.assignedTo}
                     </div>
                   )}
-                  {complaint.imageBase64 && (
-                    complaint.imageBase64.startsWith('data:video') ? (
-                      <video src={complaint.imageBase64} className="w-full h-32 object-cover border border-black mt-2" controls />
+                  {(() => {
+                    const mediaSrc = complaint.imageUrl || complaint.imageBase64;
+                    if (!mediaSrc) return null;
+                    const isVideo = mediaSrc.startsWith('data:video') || mediaSrc.includes('.mp4') || mediaSrc.includes('.webm');
+                    return isVideo ? (
+                      <video src={mediaSrc} className="w-full h-32 object-cover border border-black mt-2" controls />
                     ) : (
-                      <img src={complaint.imageBase64} alt="Issue" className="w-full h-32 object-cover border border-black mt-2" />
-                    )
-                  )}
+                      <img src={mediaSrc} alt="Issue" className="w-full h-32 object-cover border border-black mt-2" />
+                    );
+                  })()}
                 </div>
               </div>
             )})}

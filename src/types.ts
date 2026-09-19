@@ -18,7 +18,8 @@ export interface User {
 
 export interface Complaint {
   id: string;
-  imageBase64: string;
+  imageUrl?: string;
+  imageBase64?: string;
   latitude: number;
   longitude: number;
   landmark: string;

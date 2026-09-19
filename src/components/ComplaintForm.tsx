@@ -587,13 +587,16 @@ export function ComplaintForm({ imageSrc, currentUser, onSuccess, onCancel, onRe
               </p>
               
               <div className="flex gap-4 p-4 bg-black/5 border border-black items-start">
-                {duplicateWarning.imageBase64 && (
-                  duplicateWarning.imageBase64.startsWith('data:video') ? (
-                    <video src={duplicateWarning.imageBase64} className="w-24 h-24 object-cover border border-black grayscale" />
+                {(() => {
+                  const mediaSrc = duplicateWarning.imageUrl || duplicateWarning.imageBase64;
+                  if (!mediaSrc) return null;
+                  const isVideo = mediaSrc.startsWith('data:video') || mediaSrc.includes('.mp4') || mediaSrc.includes('.webm');
+                  return isVideo ? (
+                    <video src={mediaSrc} className="w-24 h-24 object-cover border border-black grayscale" />
                   ) : (
-                    <img src={duplicateWarning.imageBase64} alt="Original issue" className="w-24 h-24 object-cover border border-black grayscale" />
-                  )
-                )}
+                    <img src={mediaSrc} alt="Original issue" className="w-24 h-24 object-cover border border-black grayscale" />
+                  );
+                })()}
                 <div className="text-sm font-mono line-clamp-4">
                   "{duplicateWarning.description}"
                 </div>

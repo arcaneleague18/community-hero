@@ -203,17 +203,22 @@ export function Dashboard({ onBack, currentUser, showOnlyUserContributions = fal
             {filteredComplaints.map((complaint) => (
               <div key={complaint.id} className="border border-black group bg-white flex flex-col">
                 <div className="w-full aspect-video border-b border-black overflow-hidden bg-black/5">
-                  {complaint.imageBase64 ? (
-                    complaint.imageBase64.startsWith('data:video') ? (
-                      <video src={complaint.imageBase64} className="w-full h-full object-cover grayscale transition-all duration-500" controls />
+                  {(() => {
+                    const mediaSrc = complaint.imageUrl || complaint.imageBase64;
+                    if (!mediaSrc) {
+                      return (
+                        <div className="w-full h-full flex items-center justify-center text-black/20">
+                          <AlertCircle size={32} />
+                        </div>
+                      );
+                    }
+                    const isVideo = mediaSrc.startsWith('data:video') || mediaSrc.includes('.mp4') || mediaSrc.includes('.webm');
+                    return isVideo ? (
+                      <video src={mediaSrc} className="w-full h-full object-cover grayscale transition-all duration-500" controls />
                     ) : (
-                      <img src={complaint.imageBase64} alt="Issue" className="w-full h-full object-cover grayscale transition-all duration-500" />
-                    )
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-black/20">
-                      <AlertCircle size={32} />
-                    </div>
-                  )}
+                      <img src={mediaSrc} alt="Issue" className="w-full h-full object-cover grayscale transition-all duration-500" />
+                    );
+                  })()}
                 </div>
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
