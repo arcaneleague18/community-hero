@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getComplaints, getAllUsers, updateUserRole, deleteUser } from '../lib/firebase';
+import { getComplaints, getAllUsers, updateUserRole, deleteUser, authFetch } from '../lib/firebase';
 import { Complaint, User, Role } from '../types';
 import { ArrowLeft, Loader2, MapPin, CheckCircle, Clock, AlertCircle, Shield, Trash2, X, Settings, Search, List, Map as MapIcon, Ban } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -122,7 +122,7 @@ export function AdminDashboard({ onBack, currentUser }: { onBack: () => void, cu
     }
     setIsSearching(true);
     try {
-      const response = await fetch('/api/search', {
+      const response = await authFetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getComplaints, updateComplaintStatus, toggleUpvoteComplaint, getAllUsers } from '../lib/firebase';
+import { getComplaints, updateComplaintStatus, toggleUpvoteComplaint, getAllUsers, authFetch } from '../lib/firebase';
 import { Complaint, User } from '../types';
 import { ArrowLeft, Loader2, MapPin, Clock, AlertCircle, ArrowUp, CheckCircle, CheckSquare, User as UserIcon, Search, List, Map as MapIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -88,7 +88,7 @@ export function VerifierDashboard({ onBack, currentUser }: { onBack: () => void,
     }
     setIsSearching(true);
     try {
-      const response = await fetch('/api/search', {
+      const response = await authFetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

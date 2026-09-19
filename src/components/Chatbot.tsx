@@ -3,6 +3,7 @@ import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
 import { User } from '../types';
 import Markdown from 'react-markdown';
 import * as htmlToImage from 'html-to-image';
+import { authFetch } from '../lib/firebase';
 
 interface Message {
   role: 'user' | 'model';
@@ -77,7 +78,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
         }
       };
 
-      let response = await fetch('/api/chat', {
+      let response = await authFetch('/api/chat', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
           console.warn('Failed to capture screenshot', err);
         }
 
-        response = await fetch('/api/chat', {
+        response = await authFetch('/api/chat', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

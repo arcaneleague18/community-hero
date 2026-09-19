@@ -3,22 +3,127 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
+
+// In-memory cache for verified Firebase ID tokens to avoid redundant network lookups
+const tokenCache = new Map<string, { uid: string; expiresAt: number }>();
+
+async function verifyFirebaseToken(token: string): Promise<string | null> {
+  const cached = tokenCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.uid;
+  }
+
+  const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+  if (!apiKey) {
+    console.error("Missing Firebase API key for token verification");
+    return null;
+  }
+
+  try {
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token })
+      }
+    );
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = (await res.json()) as any;
+    if (data.users && data.users[0]?.localId) {
+      const uid = data.users[0].localId as string;
+      tokenCache.set(token, { uid, expiresAt: Date.now() + 5 * 60 * 1000 });
+
+      // Clean up cache if it grows large
+      if (tokenCache.size > 1000) {
+        const now = Date.now();
+        for (const [k, v] of tokenCache.entries()) {
+          if (v.expiresAt <= now) tokenCache.delete(k);
+        }
+      }
+
+      return uid;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error verifying Firebase ID token:", err);
+    return null;
+  }
+}
+
+const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized: Missing Authorization header" });
+  }
+
+  const token = authHeader.substring(7).trim();
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: Token missing" });
+  }
+
+  const uid = await verifyFirebaseToken(token);
+  if (!uid) {
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired authentication token" });
+  }
+
+  (req as any).user = { uid };
+  next();
+};
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  // Rate Limiters
+  const geocodeLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 60, // 60 requests per 15 min per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many geocoding requests from this IP, please try again later." }
+  });
 
-  // Gemini API Proxy
-  app.post("/api/describe-issue", async (req, res) => {
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    limit: 15, // 15 requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Rate limit exceeded for AI requests. Please slow down." }
+  });
+
+  // Body parsers: route-specific 10MB limit for media upload endpoints
+  const mediaJsonParser = express.json({ limit: "10mb" });
+  app.use("/api/describe-issue", mediaJsonParser);
+  app.use("/api/verify-issue", mediaJsonParser);
+
+  // Strict 1MB limit for all other routes to protect memory
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
+
+  // Gemini API Proxy: Describe Issue
+  app.post("/api/describe-issue", aiLimiter, requireAuth, async (req, res) => {
     try {
       const { imageBase64, mimeType = "image/jpeg" } = req.body;
-      if (!imageBase64) {
-        return res.status(400).json({ error: "Missing imageBase64" });
+      if (!imageBase64 || typeof imageBase64 !== "string") {
+        return res.status(400).json({ error: "Missing or invalid imageBase64" });
+      }
+
+      // Max 10MB base64 string length (~7.5MB raw)
+      if (imageBase64.length > 14 * 1024 * 1024) {
+        return res.status(413).json({ error: "Media size exceeds 10MB limit" });
+      }
+
+      const allowedMimes = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"];
+      if (mimeType && !allowedMimes.includes(mimeType)) {
+        return res.status(400).json({ error: "Unsupported media format" });
       }
 
       if (!process.env.GEMINI_API_KEY) {
@@ -53,11 +158,23 @@ async function startServer() {
   });
 
   // Gemini API Verify Issue
-  app.post("/api/verify-issue", async (req, res) => {
+  app.post("/api/verify-issue", aiLimiter, requireAuth, async (req, res) => {
     try {
       const { mediaBase64, mimeType, userDescription } = req.body;
-      if (!mediaBase64 || !mimeType || !userDescription) {
-        return res.status(400).json({ error: "Missing required fields" });
+      if (!mediaBase64 || typeof mediaBase64 !== "string") {
+        return res.status(400).json({ error: "Missing or invalid mediaBase64" });
+      }
+      if (mediaBase64.length > 14 * 1024 * 1024) {
+        return res.status(413).json({ error: "Media size exceeds 10MB limit" });
+      }
+      if (!mimeType || typeof mimeType !== "string") {
+        return res.status(400).json({ error: "Missing or invalid mimeType" });
+      }
+      if (!userDescription || typeof userDescription !== "string" || userDescription.trim().length === 0) {
+        return res.status(400).json({ error: "userDescription is required" });
+      }
+      if (userDescription.length > 500) {
+        return res.status(400).json({ error: "userDescription exceeds maximum length of 500 characters" });
       }
 
       if (!process.env.GEMINI_API_KEY) {
@@ -93,11 +210,31 @@ async function startServer() {
   });
 
   // Gemini API Chat
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", aiLimiter, requireAuth, async (req, res) => {
     try {
       const { messages, context, screenshot } = req.body;
-      if (!messages) {
-        return res.status(400).json({ error: "Missing messages" });
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Missing or invalid messages array" });
+      }
+      if (messages.length > 30) {
+        return res.status(400).json({ error: "Conversation history exceeds limit of 30 messages" });
+      }
+
+      for (const msg of messages) {
+        if (!msg || typeof msg !== "object" || !["user", "model"].includes(msg.role)) {
+          return res.status(400).json({ error: "Invalid message format" });
+        }
+        if (Array.isArray(msg.parts)) {
+          for (const part of msg.parts) {
+            if (typeof part?.text === "string" && part.text.length > 4000) {
+              return res.status(400).json({ error: "Message content exceeds max allowed length" });
+            }
+          }
+        }
+      }
+
+      if (screenshot && (typeof screenshot !== "string" || screenshot.length > 7 * 1024 * 1024)) {
+        return res.status(400).json({ error: "Invalid screenshot format or size exceeds 5MB" });
       }
 
       if (!process.env.GEMINI_API_KEY) {
@@ -130,7 +267,6 @@ Please answer questions related to the application, the user's current view, or 
         const lastMessage = processedMessages[processedMessages.length - 1];
         if (lastMessage.role === 'user') {
           const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, "");
-          // Replace parts to include the image
           lastMessage.parts = [
             ...lastMessage.parts,
             {
@@ -188,20 +324,22 @@ Please answer questions related to the application, the user's current view, or 
     }
   });
 
-  // Geocode API (Google Maps with fallback to Nominatim)
-  app.post("/api/geocode", async (req, res) => {
+  // Geocode API (Google Maps with fallback to Nominatim) - Protected with geocodeLimiter and coordinate bounds checks
+  app.post("/api/geocode", geocodeLimiter, async (req, res) => {
     try {
       const { lat, lng } = req.body;
-      if (lat === undefined || lng === undefined) {
-        return res.status(400).json({ error: "Missing lat/lng" });
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+
+      if (lat === undefined || lng === undefined || isNaN(numLat) || isNaN(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+        return res.status(400).json({ error: "Valid latitude (-90 to 90) and longitude (-180 to 180) are required" });
       }
 
       if (process.env.GOOGLE_MAPS_API_KEY) {
         // Use Google Maps Geocoding
-        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.GOOGLE_MAPS_API_KEY}`);
+        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${numLat},${numLng}&key=${process.env.GOOGLE_MAPS_API_KEY}`);
         const data = await response.json();
         if (data.status === 'OK' && data.results.length > 0) {
-          // Extract a region-like component
           const addressComponents = data.results[0].address_components;
           const regionComp = addressComponents.find((c: any) => 
             c.types.includes('neighborhood') || 
@@ -215,8 +353,8 @@ Please answer questions related to the application, the user's current view, or 
         }
       }
 
-      // Fallback to Nominatim (OpenStreetMap) if no Google Maps API key or if Google Maps fails to find a good region
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+      // Fallback to Nominatim (OpenStreetMap)
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${numLat}&lon=${numLng}&format=json`, {
         headers: {
           'User-Agent': 'CommunityHeroApp/1.0'
         }
@@ -234,12 +372,21 @@ Please answer questions related to the application, the user's current view, or 
     }
   });
 
-  // AI Search
-  app.post("/api/search", async (req, res) => {
+  // AI Search - Protected with aiLimiter, requireAuth, and input length bounds
+  app.post("/api/search", aiLimiter, requireAuth, async (req, res) => {
     try {
       const { query, issues } = req.body;
-      if (!query || !issues) {
-        return res.status(400).json({ error: "Missing query or issues" });
+      if (!query || typeof query !== "string" || query.trim().length === 0) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+      if (query.length > 300) {
+        return res.status(400).json({ error: "Query exceeds maximum length of 300 characters" });
+      }
+      if (!issues || !Array.isArray(issues)) {
+        return res.status(400).json({ error: "Issues must be an array" });
+      }
+      if (issues.length > 100) {
+        return res.status(400).json({ error: "Issues array exceeds maximum batch size of 100 items" });
       }
 
       if (!process.env.GEMINI_API_KEY) {

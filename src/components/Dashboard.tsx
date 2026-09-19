@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getComplaints, toggleUpvoteComplaint } from '../lib/firebase';
+import { getComplaints, toggleUpvoteComplaint, authFetch } from '../lib/firebase';
 import { Complaint, User } from '../types';
 import { ArrowLeft, Loader2, MapPin, Clock, AlertCircle, ArrowUp, Filter, X, Map as MapIcon, List, Search } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -86,7 +86,7 @@ export function Dashboard({ onBack, currentUser, showOnlyUserContributions = fal
     }
     setIsSearching(true);
     try {
-      const response = await fetch('/api/search', {
+      const response = await authFetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

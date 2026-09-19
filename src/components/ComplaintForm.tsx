@@ -1,6 +1,6 @@
 import { User, Complaint } from '../types';
 import React, { useState, useEffect, useRef } from 'react';
-import { addComplaint, getComplaints, toggleUpvoteComplaint, awardPoints } from '../lib/firebase';
+import { addComplaint, getComplaints, toggleUpvoteComplaint, awardPoints, authFetch } from '../lib/firebase';
 import { getDistance } from 'geolib';
 import { MapPin, Sparkles, Loader2, ArrowLeft, CheckCircle, Heart, Crop as CropIcon, X, Check, ArrowUp, AlertCircle } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
@@ -157,7 +157,7 @@ export function ComplaintForm({ imageSrc, currentUser, onSuccess, onCancel, onRe
       const match = croppedImageSrc.match(/data:([^;]+);/);
       const mimeType = match ? match[1] : (isVideo ? 'video/mp4' : 'image/jpeg');
 
-      const response = await fetch('/api/describe-issue', {
+      const response = await authFetch('/api/describe-issue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -252,7 +252,7 @@ export function ComplaintForm({ imageSrc, currentUser, onSuccess, onCancel, onRe
         const mimeType = match ? match[1] : (isVideo ? 'video/mp4' : 'image/jpeg');
         
         // We might want to compress or extract frames from video, but for now we send base64
-        const response = await fetch('/api/verify-issue', {
+        const response = await authFetch('/api/verify-issue', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

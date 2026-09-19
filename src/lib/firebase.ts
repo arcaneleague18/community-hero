@@ -32,6 +32,36 @@ export const waitForAuth = (): Promise<string | null> => {
   });
 };
 
+/** Authenticated fetch wrapper that automatically attaches Firebase ID token in Authorization header */
+export const authFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  let token: string | null = null;
+  if (!auth.currentUser) {
+    try {
+      await signInAnon();
+    } catch (err) {
+      console.warn("Could not sign in anonymously before fetch:", err);
+    }
+  }
+
+  if (auth.currentUser) {
+    try {
+      token = await auth.currentUser.getIdToken();
+    } catch (err) {
+      console.warn("Failed to retrieve ID token:", err);
+    }
+  }
+
+  const headers = new Headers(init?.headers);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  return fetch(input, {
+    ...init,
+    headers
+  });
+};
+
 export const addComplaint = async (data: any) => {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
