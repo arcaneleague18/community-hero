@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, Loader2, Camera } from 'lucide-react';
 import { User } from '../types';
 import Markdown from 'react-markdown';
 import * as htmlToImage from 'html-to-image';
@@ -17,6 +17,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingScreenshotPayload, setPendingScreenshotPayload] = useState<any | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatbotRef = useRef<HTMLDivElement>(null);
 
@@ -25,6 +26,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
     setMessages([
       { role: 'model', parts: [{ text: 'Hello! I am your Community Hero AI assistant. How can I help you today?' }] }
     ]);
+    setPendingScreenshotPayload(null);
     setIsOpen(false);
   }, [currentUser?.id]);
 
@@ -32,7 +34,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, pendingScreenshotPayload]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,25 +51,29 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
     };
   }, [isOpen]);
 
-  const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const currentInput = input;
-    const newMessages = [...messages, { role: 'user' as const, parts: [{ text: currentInput }] }];
+    // If there was a pending screenshot request, cancel it since user is asking a new question
+    setPendingScreenshotPayload(null);
+
+    const userMessage: Message = {
+      role: 'user',
+      parts: [{ text: input.trim() }]
+    };
+
+    const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      // To use less tokens, limit the history sent to the server.
-      // We take a maximum of 5 messages. Since the last message is from the user,
-      // an odd number ensures the sliced array starts with a user message,
-      // which is required by the Gemini API after the server's initial model response.
-      const historyLength = 5;
-      let startIndex = newMessages.length - historyLength;
-      if (startIndex < 1) startIndex = 1; // Always skip the first 'model' greeting message
-      
+      // Keep last 10 messages for context, starting from a user message
+      let startIndex = Math.max(0, newMessages.length - 10);
+      while (startIndex < newMessages.length && newMessages[startIndex].role !== 'user') {
+        startIndex++;
+      }
       const messagesToSend = newMessages.slice(startIndex);
 
       const payload = {
@@ -78,7 +84,7 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
         }
       };
 
-      let response = await authFetch('/api/chat', {
+      const response = await authFetch('/api/chat', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -99,46 +105,11 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
         throw new Error('Received invalid JSON from server. The server might not be running correctly.');
       }
 
+      // If the model asks for a screenshot, require explicit user consent
       if (data.action === 'REQUEST_SCREENSHOT') {
-        let screenshotData = '';
-        try {
-          screenshotData = await htmlToImage.toJpeg(document.body, {
-            quality: 0.3,
-            pixelRatio: 0.5,
-            fontEmbedCSS: '',
-            filter: (node) => {
-              if (node.classList && node.classList.contains('chatbot-container')) {
-                return false;
-              }
-              return true;
-            }
-          });
-        } catch (err) {
-          console.warn('Failed to capture screenshot', err);
-        }
-
-        response = await authFetch('/api/chat', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            ...payload,
-            screenshot: screenshotData
-          })
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Failed to send message with screenshot: ${response.status} ${text}`);
-        }
-        
-        try {
-          data = await response.json();
-        } catch (e) {
-          throw new Error('Received invalid JSON from server on screenshot request.');
-        }
+        setPendingScreenshotPayload(payload);
+        setIsLoading(false);
+        return;
       }
 
       setMessages(prev => [...prev, { role: 'model', parts: [{ text: data.text }] }]);
@@ -146,6 +117,103 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
       console.error('Chat error:', error);
       const isUnavailable = error?.message?.includes('503') || error?.message?.includes('unavailable');
       setMessages(prev => [...prev, { role: 'model', parts: [{ text: isUnavailable ? 'The AI service is temporarily unavailable. Please try again later.' : 'Sorry, I encountered an error. Please try again.' }] }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmScreenshot = async () => {
+    if (!pendingScreenshotPayload) return;
+    const payload = pendingScreenshotPayload;
+    setPendingScreenshotPayload(null);
+    setIsLoading(true);
+
+    let screenshotData = '';
+    try {
+      screenshotData = await htmlToImage.toJpeg(document.body, {
+        quality: 0.3,
+        pixelRatio: 0.5,
+        fontEmbedCSS: '',
+        filter: (node) => {
+          if (node.classList && node.classList.contains('chatbot-container')) {
+            return false;
+          }
+          return true;
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to capture screenshot', err);
+    }
+
+    try {
+      const response = await authFetch('/api/chat', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          ...payload,
+          screenshot: screenshotData
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to send message with screenshot: ${response.status} ${text}`);
+      }
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: data.text }] }]);
+    } catch (error: any) {
+      console.error('Chat error with screenshot:', error);
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: 'Failed to process the screen view. Please try again.' }] }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeclineScreenshot = async () => {
+    if (!pendingScreenshotPayload) return;
+    const payload = pendingScreenshotPayload;
+    setPendingScreenshotPayload(null);
+    setIsLoading(true);
+
+    try {
+      const updatedMessages = [
+        ...payload.messages,
+        {
+          role: 'user',
+          parts: [{ text: 'Visual context was declined. Answer based on text context alone without requesting a screenshot.' }]
+        }
+      ];
+
+      const response = await authFetch('/api/chat', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          ...payload,
+          messages: updatedMessages,
+          screenshot: undefined
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to send follow-up: ${response.status} ${text}`);
+      }
+
+      const data = await response.json();
+      const answer = data.text 
+        ? `Since visual context was declined, I'm now answering based on text context alone.\n\n${data.text}`
+        : "Since visual context was declined, I'm now answering based on text context alone.";
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: answer }] }]);
+    } catch (error: any) {
+      console.error('Chat error after declining screenshot:', error);
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: "Since visual context was declined, I'm now answering based on text context alone." }] }]);
     } finally {
       setIsLoading(false);
     }
@@ -179,6 +247,36 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
                 </div>
               </div>
             ))}
+
+            {pendingScreenshotPayload && (
+              <div className="p-3 border-2 border-black bg-white shadow-sm flex flex-col gap-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-black">
+                  <Camera size={14} /> Screen View Request
+                </div>
+                <p className="text-xs text-gray-700">
+                  The assistant is requesting to view your screen to help answer your question. Do you want to share a screenshot?
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={handleConfirmScreenshot}
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-black/80 transition-colors disabled:opacity-50"
+                  >
+                    Allow Screen View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeclineScreenshot}
+                    disabled={isLoading}
+                    className="px-3 py-1.5 border border-black bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="max-w-[85%] p-3 text-sm bg-white border border-black text-black flex items-center gap-2">
@@ -196,11 +294,11 @@ export function Chatbot({ currentUser, currentView }: { currentUser: User | null
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask anything..."
               className="flex-1 p-2 text-sm border border-black focus:outline-none focus:ring-1 focus:ring-black"
-              disabled={isLoading}
+              disabled={isLoading || Boolean(pendingScreenshotPayload)}
             />
             <button 
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || !input.trim() || Boolean(pendingScreenshotPayload)}
               className="p-2 bg-black text-white disabled:bg-gray-400 hover:bg-gray-800 transition-colors"
             >
               <Send size={18} />
